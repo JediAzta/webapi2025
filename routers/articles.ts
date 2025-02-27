@@ -1,66 +1,69 @@
 import Router, {RouterContext} from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import { body } from 'koa-req-validation';
+import * as articlesmodel from '../models/articles';
 
 const router = new Router({prefix: '/api/v1/articles'});
-const articles = [
-    {title: 'hello article', fullText: 'some text here'},
-    {title: 'another article', fullText: 'another text'},
-    {title: 'Coventry University', fullText:'some news from university'}
-];
 
 interface Article {
     title: string,
-    fullText: string
+    alltext: string
 }
 
 const getAll = async (ctx:RouterContext, next: any) => {
-    ctx.body = articles;
+    let articles = await articlesmodel.getAll();
+    if(articles.length){
+        ctx.body = articles;
+    } else {
+        ctx.body = {}
+    }
     await next();
 }
 
 const getById = async (ctx:RouterContext, next: any) => {
-    let id = +ctx.params.id;
-    if((id<=articles.length) && id>0){
-        ctx.body = articles[id-1];
+    let id = ctx.params.id;
+    let article = await articlesmodel.getById(id);
+    if(article.length){
+        ctx.body = article[0];
     } else {
         ctx.status = 404;
     }
     await next();
 }
 const createArticle = async (ctx:RouterContext, next: any) => {
-    let article = <Article> ctx.request.body;
-    let newArticle = {title: article.title, fullText: article.fullText};
-    articles.push(newArticle);
-    ctx.status = 201;
-    ctx.body = newArticle;
+    const body = <Article> ctx.request.body;
+    let result = await articlesmodel.add(body);
+    if(result.status == 201){
+        ctx.status = 201;
+        ctx.body = body;
+    } else {
+        ctx.status = 500;
+        ctx.body = { err: "Insert data failed"};
+    }
     await next();
 }
 const updateArticle = async (ctx:RouterContext, next: any) => {
-    let id = +ctx.params.id;
-    let article = <Article> ctx.request.body;
-    let updateArticle = {title: article.title, fullText: article.fullText};
-    if((id<=articles.length) && id>0){
-        articles[id-1].title = updateArticle.title;
-        articles[id-1].fullText = updateArticle.fullText;
-        ctx.body = {
-            message: "update successfully"
-        }
-    } else {
-        ctx.status = 404;
+    const body = <Article> ctx.request.body;
+    let result = await articlesmodel.update(parseInt(ctx.params.id), body);
+    switch(result.status){
+        case 201:
+            ctx.status = 201;
+            ctx.body = { description: 'Data update succesfully'};
+            break;
+        case 404:
+            ctx.status = 404;
+            ctx.body = { description: 'ID not found and no data updated'};
+            break;
+        default:
+            ctx.status = 500;
+            ctx.body = { err: "Update data failed"};
+            break;
     }
     await next();
 }
 const deleteArticle = async (ctx:RouterContext, next: any) => {
-    let id = +ctx.params.id;
-    if((id<=articles.length) && id>0){
-        articles.splice(id-1, 1);
-        ctx.body = {
-            message: "Article deleted"
-        }
-    } else {
-        ctx.status = 404;
-    }
+    await articlesmodel.deleteArticle(parseInt(ctx.params.id));
+    ctx.status = 200;
+    ctx.body = {status: 'operation successfully'}
     await next();
 }
 
